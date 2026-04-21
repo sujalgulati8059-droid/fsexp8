@@ -1,57 +1,32 @@
-const express = require('express');
-const jwt = require('jsonwebtoken');
-const cors = require('cors');
- 
-const app = express();
-const SECRET = 'mySecretKey123';  // use env variable in production
- 
-app.use(cors());
-app.use(express.json());
- 
-// ── Simulated user database ────────────────────────────
-const USERS = [{ id: 1, username: 'admin', password: 'password123' }];
- 
-// ── JWT Middleware ─────────────────────────────────────
-function verifyToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
- 
-  if (!token) {
-    return res.status(401).json({ error: 'Missing token' });
-  }
-  try {
-    const decoded = jwt.verify(token, SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-}
- 
-// ── POST /api/login ────────────────────────────────────
-app.post('/api/login', (req, res) => {
-  const { username, password } = req.body;
-  const user = USERS.find(
-    u => u.username === username && u.password === password
-  );
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
-  }
-  const token = jwt.sign(
-    { id: user.id, username: user.username },
-    SECRET,
-    { expiresIn: '1h' }
-  );
-  res.json({ token });
-});
- 
-// ── GET /api/protected ────────────────────────────────
-app.get('/api/protected', verifyToken, (req, res) => {
-  res.json({
-    message: `Welcome ${req.user.username}`,
-    user: { id: req.user.id, username: req.user.username }
-  });
-});
- 
-app.listen(3001, () => console.log('Server on http://localhost:3001'));
+// Mock API — no real backend needed for demo
+const MOCK_USER = { id: 1, username: 'admin' };
+const MOCK_PASSWORD = 'password123';
 
+const api = {
+  post: async (url, data) => {
+    if (url === '/login') {
+      if (data.username === MOCK_USER.username && data.password === MOCK_PASSWORD) {
+        // encode a fake token: base64(payload)
+        const token = btoa(JSON.stringify({ ...MOCK_USER, exp: Date.now() + 3600000 }));
+        return { data: { token } };
+      }
+      const err = new Error('Invalid credentials');
+      err.response = { data: { error: 'Invalid credentials' } };
+      throw err;
+    }
+  },
+  get: async (url) => {
+    if (url === '/protected') {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        const err = new Error('Unauthorized');
+        err.response = { status: 401 };
+        throw err;
+      }
+      const user = JSON.parse(atob(token));
+      return { data: { message: `Welcome ${user.username}`, user } };
+    }
+  }
+};
+
+export default api;
